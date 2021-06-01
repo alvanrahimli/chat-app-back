@@ -4,28 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/google/uuid"
-	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
 	"time"
 	messengerWs "tree-messenger/pkg/messenger-ws"
 )
 
-type CommandType string
-const (
-	Registration CommandType = "register"
-	BecomeOnline CommandType = "become_alive"
-)
 
-type ClientCommand struct {
-	Type	CommandType `json:"type"`
-	Content string `json:"content"`
-}
-
-type ClientResponse struct {
-	Status	string `json:"status"`
-	Content string `json:"content"`
-}
 
 func serveWs(pool *messengerWs.Pool, w http.ResponseWriter, r *http.Request) {
 	wsConn, upgradeErr := messengerWs.Upgrade(w, r)
@@ -35,7 +20,7 @@ func serveWs(pool *messengerWs.Pool, w http.ResponseWriter, r *http.Request) {
 	}
 
 	for {
-		var clientCommand ClientCommand
+		var clientCommand messengerWs.ClientCommand
 
 		_, p, msgErr := wsConn.ReadMessage()
 		if msgErr != nil {
@@ -49,37 +34,30 @@ func serveWs(pool *messengerWs.Pool, w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		if clientCommand.Type == Registration {
+		if clientCommand.Type == messengerWs.Registration {
 			client := messengerWs.Client{
 				ID:			uuid.New().String(),
 				Name:		clientCommand.Content,
 				Conn:		wsConn,
 				LastPing: 	time.Now().UTC(),
+				Pool:		pool,
 			}
 
-			responseObj := ClientResponse {
+			responseObj := messengerWs.ClientResponse {
 				Status:  "ok",
 				Content: client.ID,
 			}
 
-			responseJson, marshallErr := json.Marshal(responseObj)
-			if marshallErr != nil {
-				log.Printf("Error: %s", marshallErr.Error())
-				continue
-			}
-
-			responseErr := wsConn.WriteMessage(websocket.TextMessage, responseJson)
-			if responseErr != nil {
-				log.Printf("RESPONSE ERROR: %s", responseErr.Error())
-				continue
+			sendErr := client.Send(responseObj)
+			if sendErr != nil {
+				log.Printf("Error: %s", sendErr.Error())
 			}
 
 			pool.Register <- &client
 			client.Read()
-		} else if clientCommand.Type == BecomeOnline {
+		} else if clientCommand.Type == messengerWs.BecomeOnline {
 			pool.MakeOnline <- clientCommand.Content
 		}
-
 	}
 }
 

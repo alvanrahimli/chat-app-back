@@ -1,6 +1,7 @@
 package messenger_ws
 
 import (
+	"encoding/json"
 	"github.com/gorilla/websocket"
 	"log"
 	"time"
@@ -31,6 +32,48 @@ func (client *Client) Read() {
 			break
 		}
 
+		var clientCommand ClientCommand
+		unmarshallErr := json.Unmarshal(p, &clientCommand)
+		if unmarshallErr != nil {
+			log.Printf("Error: %s", unmarshallErr.Error())
+			continue
+		}
+
+
+		if clientCommand.Type == NewMessageCmd {
+			var newMessage NewMessageContext
+			msgUnmarshallErr := json.Unmarshal([]byte(clientCommand.Content), &newMessage)
+			if msgUnmarshallErr != nil {
+				log.Printf("Error: %s", msgUnmarshallErr.Error())
+				continue
+			}
+
+			newMessage.HandleRequest(client)
+		} else if clientCommand.Type ==  CreateGroup {
+			var createGroupContext CreateGroupContext
+			msgUnmarshallErr := json.Unmarshal([]byte(clientCommand.Content), &createGroupContext)
+			if msgUnmarshallErr != nil {
+				log.Printf("Error: %s", msgUnmarshallErr.Error())
+				continue
+			}
+		} else if clientCommand.Type == AddMember {
+
+		}
+
 		log.Println(string(p))
 	}
+}
+
+func (client *Client) Send(v interface{}) error {
+	data, jsonErr := json.Marshal(v)
+	if jsonErr != nil {
+		return jsonErr
+	}
+
+	writeErr := client.Conn.WriteMessage(websocket.TextMessage, data)
+	if writeErr != nil {
+		return writeErr
+	}
+
+	return nil
 }

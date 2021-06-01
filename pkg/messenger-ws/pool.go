@@ -11,20 +11,22 @@ type Pool struct {
 	Register	chan *Client
 	Unregister	chan *Client
 	MakeOnline	chan string
+	MakeOffline chan string
 	Clients		map[*Client]bool
 	Groups		[]*Group
-	Send		chan Message
+	Send		chan NewMessageContext
 }
 
 func InitializePool() *Pool {
 	return &Pool{
-		StartTime: time.Now().UTC(),
-		Register:   make(chan *Client),
-		Unregister: make(chan *Client),
-		MakeOnline: make(chan string),
-		Clients: 	make(map[*Client]bool),
-		Groups:     make([]*Group, 10),
-		Send:       make(chan Message),
+		StartTime: 		time.Now().UTC(),
+		Register:   	make(chan *Client),
+		Unregister: 	make(chan *Client),
+		MakeOnline: 	make(chan string),
+		MakeOffline:	make(chan string),
+		Clients: 		make(map[*Client]bool),
+		Groups:     	make([]*Group, 10),
+		Send:       	make(chan NewMessageContext),
 	}
 }
 
@@ -46,7 +48,12 @@ func (pool *Pool) Start() {
 					pool.Clients[client] = true
 				}
 			}
-
+		case id := <- pool.MakeOffline:
+			for client := range pool.Clients {
+				if client.ID == id {
+					pool.Clients[client] = false
+				}
+			}
 
 		case message := <- pool.Send:
 			log.Println(message.Content)
