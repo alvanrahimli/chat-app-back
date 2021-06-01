@@ -56,8 +56,17 @@ func (client *Client) Read() {
 				log.Printf("Error: %s", msgUnmarshallErr.Error())
 				continue
 			}
-		} else if clientCommand.Type == AddMember {
 
+			createGroupContext.HandleRequest(client)
+		} else if clientCommand.Type == AddMember {
+			var addMemberContext AddMemberContext
+			unmarshallErr := json.Unmarshal([]byte(clientCommand.Content), &addMemberContext)
+			if unmarshallErr != nil {
+				log.Printf("Error: %s", unmarshallErr.Error())
+				continue
+			}
+
+			addMemberContext.HandleRequest(client)
 		}
 
 		log.Println(string(p))
