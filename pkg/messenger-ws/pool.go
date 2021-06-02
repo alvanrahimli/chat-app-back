@@ -5,6 +5,10 @@ import (
 	"time"
 )
 
+type GetClientsContext struct {
+	ClientId	string
+}
+
 type Pool struct {
 	StartTime	time.Time
 
@@ -25,7 +29,7 @@ func InitializePool() *Pool {
 		MakeOnline: 	make(chan string),
 		MakeOffline:	make(chan string),
 		Clients: 		make(map[*Client]bool),
-		Groups:     	make([]*Group, 10),
+		Groups:     	make([]*Group, 0),
 		Send:       	make(chan NewMessageContext),
 	}
 }
@@ -58,5 +62,22 @@ func (pool *Pool) Start() {
 		case message := <- pool.Send:
 			log.Println(message.Content)
 		}
+	}
+}
+
+func (pool *Pool) HandleGetClients(client *Client) {
+	var clients []string
+	for c, _ := range client.Pool.Clients {
+		clients = append(clients, c.ID)
+	}
+
+	response := ClientResponse{
+		Status:  Ok,
+		Type:    ClientsList,
+		Content: clients,
+	}
+	sendErr := client.Send(response)
+	if sendErr != nil {
+		log.Printf("Error: %s", sendErr.Error())
 	}
 }

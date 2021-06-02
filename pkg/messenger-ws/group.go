@@ -1,9 +1,9 @@
 package messenger_ws
 
 import (
+	"fmt"
 	"github.com/google/uuid"
 	"log"
-	"time"
 )
 
 type PrivacyType string
@@ -32,25 +32,20 @@ type AddMemberContext struct {
 	GroupId		string `json:"group_id"`
 }
 
-func (group *Group) HandleNewMessage(senderClient *Client, message *NewMessageContext) {
+func (group *Group) Broadcast(responseType ResponseType, content interface{}) {
 	for _, c := range group.Clients {				// Iterate clients of group
-		if c.ID != senderClient.ID {				// If it is other members
-			response := ClientResponse{
-				Status:  Ok,
-				Type: NewMessageRes,
-				Content: NewMessageResponse{
-					Sender:    senderClient.Name,
-					Content:   message.Content,
-					Timestamp: time.Now().UTC(),
-				},
-			}
-
-			sendErr := senderClient.Send(response)
-			if sendErr != nil {
-				log.Printf("Error: %s", sendErr.Error())
-				return
-			}
+		response := ClientResponse{
+			Status:  Ok,
+			Type: responseType,
+			Content: content,
 		}
+
+		sendErr := c.Send(response)
+		if sendErr != nil {
+			log.Printf("Error: %s", sendErr.Error())
+			return
+		}
+		log.Printf("Message sent to ClientID: %s", c.ID)
 	}
 }
 
@@ -64,6 +59,14 @@ func (createGroupContext *CreateGroupContext) HandleRequest(client *Client) {
 	}
 
 	client.Pool.Groups = append(client.Pool.Groups, &newGroup)
+	sendErr := client.Send(ClientResponse{
+		Status:  Ok,
+		Type:    GroupCreated,
+		Content: newGroup.ID,
+	})
+	if sendErr != nil {
+		log.Printf("Error: %s", sendErr.Error())
+	}
 }
 
 func (addMemberContext *AddMemberContext) HandleRequest(client *Client) {
@@ -72,6 +75,10 @@ func (addMemberContext *AddMemberContext) HandleRequest(client *Client) {
 			for guest, _ := range client.Pool.Clients {
 				if guest.ID == addMemberContext.GuestId {
 					group.Clients = append(group.Clients, guest)
+					response := fmt.Sprintf("%s:%s", guest.ID, guest.Name)
+					group.Broadcast(ClientAdded, response)
+					log.Printf("Guest-Client (%s) added to Group (%s)", guest.ID, group.ID)
+					return
 				}
 			}
 		}

@@ -7,7 +7,7 @@ import (
 type MessageType string
 
 const (
-	Ping		MessageType = "ping"
+	//Ping		MessageType = "ping"
 	// Add more message types
 )
 
@@ -22,6 +22,7 @@ const (
 	Registration  	CommandType = "register"
 	BecomeOnline  	CommandType = "become_alive"
 	NewMessageCmd 	CommandType = "new_message"
+	GetClients		CommandType = "get_clients"
 	CreateGroup		CommandType = "create_group"
 	AddMember		CommandType = "add_member"
 )
@@ -30,6 +31,8 @@ type ResponseType string
 const (
 	NewMessageRes	ResponseType = "new_message"
 	GroupCreated	ResponseType = "group_created"
+	ClientsList		ResponseType = "clients_list"
+	ClientAdded		ResponseType = "client_added"
 )
 
 type ResponseStatus string
@@ -56,8 +59,12 @@ type ClientResponse struct {
 
 func (newMessageContext *NewMessageContext) HandleRequest(client *Client) {
 	for _, group := range client.Pool.Groups { 				// Iterate groups
-		if group.ID == newMessageContext.GroupID { // Find group
-			group.HandleNewMessage(client, newMessageContext)
+		if group.ID == newMessageContext.GroupID { 			// Find group
+			group.Broadcast(NewMessageRes, NewMessageResponse{
+				Sender:    client.Name,
+				Content:   newMessageContext.Content,
+				Timestamp: time.Now().UTC(),
+			})
 		}
 	}
 }

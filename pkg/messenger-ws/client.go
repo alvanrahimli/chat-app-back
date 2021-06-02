@@ -32,13 +32,14 @@ func (client *Client) Read() {
 			break
 		}
 
+		log.Printf("MESSAGE: %s", string(p))
+
 		var clientCommand ClientCommand
 		unmarshallErr := json.Unmarshal(p, &clientCommand)
 		if unmarshallErr != nil {
 			log.Printf("Error: %s", unmarshallErr.Error())
 			continue
 		}
-
 
 		if clientCommand.Type == NewMessageCmd {
 			var newMessage NewMessageContext
@@ -67,13 +68,22 @@ func (client *Client) Read() {
 			}
 
 			addMemberContext.HandleRequest(client)
+		} else if clientCommand.Type == GetClients {
+			var getClientsContext GetClientsContext
+			unmarshallErr := json.Unmarshal([]byte(clientCommand.Content), &getClientsContext)
+			if unmarshallErr != nil {
+				log.Printf("Error: %s", unmarshallErr.Error())
+				continue
+			}
+
+			client.Pool.HandleGetClients(client)
 		}
 
 		log.Println(string(p))
 	}
 }
 
-func (client *Client) Send(v interface{}) error {
+func (client *Client) Send(v ClientResponse) error {
 	data, jsonErr := json.Marshal(v)
 	if jsonErr != nil {
 		return jsonErr
