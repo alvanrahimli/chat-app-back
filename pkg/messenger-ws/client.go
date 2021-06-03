@@ -2,6 +2,8 @@ package messenger_ws
 
 import (
 	"encoding/json"
+	"fmt"
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"log"
 	"time"
@@ -49,7 +51,7 @@ func (client *Client) Read() {
 				continue
 			}
 
-			newMessage.HandleRequest(client)
+			client.HandleNewMessage(newMessage)
 		} else if clientCommand.Type ==  CreateGroup {
 			var createGroupContext CreateGroupContext
 			msgUnmarshallErr := json.Unmarshal([]byte(clientCommand.Content), &createGroupContext)
@@ -58,7 +60,7 @@ func (client *Client) Read() {
 				continue
 			}
 
-			createGroupContext.HandleRequest(client)
+			client.HandleCreateGroup(createGroupContext)
 		} else if clientCommand.Type == AddMember {
 			var addMemberContext AddMemberContext
 			unmarshallErr := json.Unmarshal([]byte(clientCommand.Content), &addMemberContext)
@@ -67,7 +69,7 @@ func (client *Client) Read() {
 				continue
 			}
 
-			addMemberContext.HandleRequest(client)
+			client.HandleAddMember(addMemberContext)
 		} else if clientCommand.Type == GetClients {
 			var getClientsContext GetClientsContext
 			unmarshallErr := json.Unmarshal([]byte(clientCommand.Content), &getClientsContext)
@@ -76,7 +78,7 @@ func (client *Client) Read() {
 				continue
 			}
 
-			client.Pool.HandleGetClients(client)
+			client.HandleGetClients(getClientsContext)
 		}
 
 		log.Println(string(p))
@@ -95,4 +97,69 @@ func (client *Client) Send(v ClientResponse) error {
 	}
 
 	return nil
+}
+
+func (client *Client) HandleCreateGroup(createGroupContext CreateGroupContext) {
+	newGroup := Group{
+		ID:      	uuid.New().String(),
+		Name:    	createGroupContext.Name,
+		Privacy: 	createGroupContext.Privacy,
+		CreatorID: 	client.ID,
+		Clients: 	[]*Client{client},
+	}
+
+	client.Pool.Groups = append(client.Pool.Groups, &newGroup)
+	sendErr := client.Send(ClientResponse{
+		Status:  Ok,
+		Type:    GroupCreated,
+		Content: newGroup.ID,
+	})
+	if sendErr != nil {
+		log.Printf("Error: %s", sendErr.Error())
+	}
+}
+
+func (client *Client) HandleAddMember(addMemberContext AddMemberContext) {
+	for _, group := range client.Pool.Groups {
+		if group.ID == addMemberContext.GroupId && group.CreatorID == client.ID {
+			for guest, _ := range client.Pool.Clients {
+				if guest.ID == addMemberContext.GuestId {
+					group.Clients = append(group.Clients, guest)
+					response := fmt.Sprintf("%s:%s", guest.ID, guest.Name)
+					group.Broadcast(ClientAdded, response)
+					log.Printf("Guest-Client (%s) added to Group (%s)", guest.ID, group.ID)
+					return
+				}
+			}
+		}
+	}
+}
+
+func (client *Client) HandleGetClients(context GetClientsContext) {
+	var clients = make(map[string]string)
+
+	if context.GroupId != "" {
+		for _, g := range client.Pool.Groups {
+			if g.ID == context.GroupId {
+				for _, c := range g.Clients {
+					clients[c.ID] = c.Name
+				}
+			}
+		}
+	} else {
+		for c, _ := range client.Pool.Clients {
+			clients[c.ID] = c.Name
+		}
+	}
+
+
+	response := ClientResponse{
+		Status:  Ok,
+		Type:    ClientsList,
+		Content: clients,
+	}
+	sendErr := client.Send(response)
+	if sendErr != nil {
+		log.Printf("Error: %s", sendErr.Error())
+	}
 }

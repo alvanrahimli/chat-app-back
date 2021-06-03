@@ -6,7 +6,7 @@ import (
 )
 
 type GetClientsContext struct {
-	ClientId	string
+	GroupId		string `json:"group_id"`
 }
 
 type Pool struct {
@@ -62,22 +62,5 @@ func (pool *Pool) Start() {
 		case message := <- pool.Send:
 			log.Println(message.Content)
 		}
-	}
-}
-
-func (pool *Pool) HandleGetClients(client *Client) {
-	var clients []string
-	for c, _ := range client.Pool.Clients {
-		clients = append(clients, c.ID)
-	}
-
-	response := ClientResponse{
-		Status:  Ok,
-		Type:    ClientsList,
-		Content: clients,
-	}
-	sendErr := client.Send(response)
-	if sendErr != nil {
-		log.Printf("Error: %s", sendErr.Error())
 	}
 }

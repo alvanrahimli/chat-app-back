@@ -57,7 +57,7 @@ type ClientResponse struct {
 	Content interface{} 	`json:"content"`
 }
 
-func (newMessageContext *NewMessageContext) HandleRequest(client *Client) {
+func (client *Client) HandleNewMessage(newMessageContext NewMessageContext) {
 	for _, group := range client.Pool.Groups { 				// Iterate groups
 		if group.ID == newMessageContext.GroupID { 			// Find group
 			group.Broadcast(NewMessageRes, NewMessageResponse{
