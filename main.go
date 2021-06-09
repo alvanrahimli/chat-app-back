@@ -3,11 +3,12 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
 	"log"
 	"net/http"
 	"time"
 	messengerWs "tree-messenger/pkg/messenger-ws"
+
+	"github.com/google/uuid"
 )
 
 
@@ -45,6 +46,7 @@ func serveWs(pool *messengerWs.Pool, w http.ResponseWriter, r *http.Request) {
 
 			responseObj := messengerWs.ClientResponse {
 				Status:  "ok",
+				Type: messengerWs.Registered,
 				Content: client.ID,
 			}
 
@@ -76,6 +78,7 @@ func main() {
 	setupRoutes()
 
 	log.Println("Application started, listening port :8000")
+	//httpError := http.ListenAndServeTLS(":8000", "/home/alvan/mkcert/localhost.local.pem", "/home/alvan/mkcert/localhost.local-key.pem", nil)
 	httpError := http.ListenAndServe(":8000", nil)
 	if httpError != nil {
 		log.Printf("Error: %s", httpError.Error())

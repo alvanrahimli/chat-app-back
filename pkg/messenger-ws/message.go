@@ -2,6 +2,8 @@ package messenger_ws
 
 import (
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type MessageType string
@@ -23,15 +25,18 @@ const (
 	BecomeOnline  	CommandType = "become_alive"
 	NewMessageCmd 	CommandType = "new_message"
 	GetClients		CommandType = "get_clients"
+	GetGroups		CommandType = "get_groups"
 	CreateGroup		CommandType = "create_group"
 	AddMember		CommandType = "add_member"
 )
 
 type ResponseType string
 const (
+	Registered		ResponseType = "registered"
 	NewMessageRes	ResponseType = "new_message"
 	GroupCreated	ResponseType = "group_created"
 	ClientsList		ResponseType = "clients_list"
+	GroupsList		ResponseType = "groups_list"
 	ClientAdded		ResponseType = "client_added"
 )
 
@@ -41,6 +46,7 @@ const (
 )
 
 type NewMessageResponse struct {
+	ID				string
 	Sender		string
 	Content		string
 	Timestamp	time.Time
@@ -60,7 +66,8 @@ type ClientResponse struct {
 func (client *Client) HandleNewMessage(newMessageContext NewMessageContext) {
 	for _, group := range client.Pool.Groups { 				// Iterate groups
 		if group.ID == newMessageContext.GroupID { 			// Find group
-			group.Broadcast(NewMessageRes, NewMessageResponse{
+			group.Broadcast(NewMessageRes, NewMessageResponse {
+				ID: uuid.NewString(),
 				Sender:    client.Name,
 				Content:   newMessageContext.Content,
 				Timestamp: time.Now().UTC(),

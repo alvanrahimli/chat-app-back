@@ -3,10 +3,11 @@ package messenger_ws
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/gorilla/websocket"
 	"log"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/gorilla/websocket"
 )
 
 type Client struct {
@@ -15,6 +16,11 @@ type Client struct {
 	Conn		*websocket.Conn
 	LastPing 	time.Time
 	Pool		*Pool
+}
+
+type ClientDto struct {
+	ID			string
+	Name		string
 }
 
 func (client *Client) Read() {
@@ -79,9 +85,18 @@ func (client *Client) Read() {
 			}
 
 			client.HandleGetClients(getClientsContext)
-		}
+		} else if clientCommand.Type == GetGroups {
+			var getGroupsContext GetGroupsContext
+			unmarshallErr := json.Unmarshal([]byte(clientCommand.Content), &getGroupsContext)
+			if unmarshallErr != nil {
+				log.Printf("Error: %s", unmarshallErr.Error())
+				continue
+			}
 
-		log.Println(string(p))
+			client.HandleGetGroups(getGroupsContext)
+		} else {
+			log.Printf("Request not handled: %s", string(p))
+		}
 	}
 }
 
@@ -116,18 +131,20 @@ func (client *Client) HandleCreateGroup(createGroupContext CreateGroupContext) {
 	})
 	if sendErr != nil {
 		log.Printf("Error: %s", sendErr.Error())
+	} else {
+		log.Printf("Client (%s) created Group (%s)", client.ID, newGroup.ID)
 	}
 }
 
 func (client *Client) HandleAddMember(addMemberContext AddMemberContext) {
 	for _, group := range client.Pool.Groups {
 		if group.ID == addMemberContext.GroupId && group.CreatorID == client.ID {
-			for guest, _ := range client.Pool.Clients {
+			for guest := range client.Pool.Clients {
 				if guest.ID == addMemberContext.GuestId {
 					group.Clients = append(group.Clients, guest)
 					response := fmt.Sprintf("%s:%s", guest.ID, guest.Name)
 					group.Broadcast(ClientAdded, response)
-					log.Printf("Guest-Client (%s) added to Group (%s)", guest.ID, group.ID)
+					log.Printf("Guest-Client (%s) was added to Group (%s)", guest.ID, group.ID)
 					return
 				}
 			}
@@ -136,19 +153,25 @@ func (client *Client) HandleAddMember(addMemberContext AddMemberContext) {
 }
 
 func (client *Client) HandleGetClients(context GetClientsContext) {
-	var clients = make(map[string]string)
+	var clients = make([]ClientDto, 0)
 
 	if context.GroupId != "" {
 		for _, g := range client.Pool.Groups {
 			if g.ID == context.GroupId {
 				for _, c := range g.Clients {
-					clients[c.ID] = c.Name
+					clients = append(clients, ClientDto {
+						ID: c.ID,
+						Name: c.Name,
+					})
 				}
 			}
 		}
 	} else {
-		for c, _ := range client.Pool.Clients {
-			clients[c.ID] = c.Name
+		for c := range client.Pool.Clients {
+			clients = append(clients, ClientDto {
+				ID: c.ID,
+				Name: c.Name,
+			})
 		}
 	}
 
@@ -157,6 +180,34 @@ func (client *Client) HandleGetClients(context GetClientsContext) {
 		Status:  Ok,
 		Type:    ClientsList,
 		Content: clients,
+	}
+	sendErr := client.Send(response)
+	if sendErr != nil {
+		log.Printf("Error: %s", sendErr.Error())
+	}
+}
+
+func (client *Client) HandleGetGroups(getGroupsContext GetGroupsContext) {
+	groups := make([]GroupDto, 0)
+
+	for _, group := range client.Pool.Groups {
+		for _, c := range group.Clients {
+			if c.ID == getGroupsContext.ClientId {
+				groups = append(groups, GroupDto{
+					ID: group.ID,
+					Name: group.Name,
+					Privacy: group.Privacy,
+					CreatorID: group.CreatorID,
+				})
+				break
+			}
+		}
+	}
+
+	response := ClientResponse {
+		Status: Ok,
+		Type: GroupsList,
+		Content: groups,
 	}
 	sendErr := client.Send(response)
 	if sendErr != nil {

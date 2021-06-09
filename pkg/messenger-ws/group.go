@@ -20,6 +20,13 @@ type Group struct {
 	Clients 	[]*Client
 }
 
+type GroupDto struct {
+	ID			string
+	Name		string
+	Privacy		PrivacyType
+	CreatorID	string
+}
+
 type CreateGroupContext struct {
 	Name		string `json:"name"`
 	Privacy 	PrivacyType `json:"privacy"`
@@ -28,6 +35,10 @@ type CreateGroupContext struct {
 type AddMemberContext struct {
 	GuestId		string `json:"guest_id"`
 	GroupId		string `json:"group_id"`
+}
+
+type GetGroupsContext struct {
+	ClientId	string `json:"client_id"`
 }
 
 func (group *Group) Broadcast(responseType ResponseType, content interface{}) {
